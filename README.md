@@ -22,7 +22,9 @@ with tansig
 ## Result
 
 at total data set 400 records (40 tags)
+
 half for train and the other half for test
 
 train accuracy: 97.0%
+
 test accuracy: 87.5%
