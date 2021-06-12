@@ -1,55 +1,83 @@
 function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(prototypeFACE)
     % only need to train and test total 100 records
     % prototypeFACE = prototypeFACE(1:length(prototypeFACE) / 4, :);
-    prototypeFACE = prototypeFACE(1:length(prototypeFACE) / 10, :);
 
-    % pre-process
     % value-min/max-min in all vlaue prototypeFACE (正規化)
-    % end
+    minNum = inf; maxNum = -inf;
+
+    for i = 1:length(prototypeFACE)
+
+        for j = 1:length(prototypeFACE(i))
+
+            if minNum > prototypeFACE(i, j)
+                minNum = prototypeFACE(i, j);
+            end
+
+            if maxNum < prototypeFACE(i, j)
+                maxNum = prototypeFACE(i, j);
+            end
+
+        end
+
+    end
+
+    for i = 1:length(prototypeFACE)
+
+        for j = 1:length(prototypeFACE(i))
+
+            prototypeFACE(i, j) = (prototypeFACE(i, j) - minNum) / (maxNum - minNum);
+
+        end
+
+    end
 
     %一層隱藏層就OK 30個神經元
-
-    %output softmax
-    %iris只有一個output
-    %但是因為有20個目標(類別) 所以要有20個output神經元
     %最低分80分softmax就有90分以上
 
-    % result
-    % test acc = 0.34
-    % train acc = 0.80
-
     input = prototypeFACE(1:2:end, :);
+
+    targetNum = 40; % tag num = 40 (個分類)
+    tmpNUM = 30; % node num
+    length_i = length(input);
+    length_j = 20; % data 寬度 = ldanum
+
+    epochMax = 50;
+    learningRate = 0.025;
 
     % tag of the dataset
     target = [];
 
     % 40 * 5 = 200
-    for i = 1:40
+    for i = 1:targetNum
 
         for j = 1:5
-            target = [target; i];
+            temp = zeros(targetNum, 1);
+            temp(i) = 1;
+            target = cat(3, target, temp);
         end
 
     end
 
-    tmpNUM = 50;
-    length_i = length(input);
-    length_j = 20;
-    epochMax = 250; % 100-500 is enough
-    learningRate = 0.025;
+    % size(target) = 40 1 200
 
     % initialize the weight matrix
-    outputmatrix = zeros(tmpNUM, 1);
+    outputmatrix = [];
 
-    for i = 1:1:tmpNUM
+    for k = 1:1:targetNum
+        tempM = zeros(tmpNUM, 1);
 
-        for j = 1:1:1
-            outputmatrix(i, j) = rand;
+        for i = 1:1:tmpNUM
+
+            for j = 1:1:1
+                tempM(i, j) = rand;
+            end
+
         end
 
+        outputmatrix = cat(3, outputmatrix, tempM);
     end
 
-    % size(outputmatrix) = 50 1
+    % size(outputmatrix) = 30 1 40
 
     hiddenmatrix = zeros(length_j, tmpNUM);
 
@@ -71,38 +99,71 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
 
             % 前傳部分
             hiddensigma = input(iter, :) * hiddenmatrix;
-            % size(hiddensigma) = 1 50
             hiddennet = logsig(hiddensigma);
 
-            outputsigma = hiddennet * outputmatrix;
-            outputnet = purelin(outputsigma);
-            % size(outputsigma) = 1 1
-            % size(outputnet) = 1 1
+            outputsigma = [];
+            outputnet = [];
+
+            for i = 1:targetNum
+                outputsigma = [outputsigma, hiddennet * outputmatrix(:, :, i)];
+                outputnet = [outputnet, purelin(outputsigma(i))];
+            end
 
             % 倒傳部分
             % 輸出層的 delta
-            doutputnet = dpurelin(outputsigma);
-            deltaoutput = (target(iter) - outputnet) * doutputnet;
-            error = target(iter) - outputnet;
-            t = [t; error.^2];
+
+            doutputnet = [];
+            deltaoutput = [];
+            tempError = 0; %error
+
+            for i = 1:targetNum
+                doutputnet = [doutputnet, dpurelin(outputsigma(i))];
+                temp_ = target(iter) - outputnet(i);
+                deltaoutput = [deltaoutput, temp_ * doutputnet(i)];
+                tempError = tempError + temp_;
+            end
+
+            t = [t; tempError.^2];
 
             % 隱藏層的 delta
-            % deltahidden = -(deltaoutput * hiddennet); % bad acc = 0.0250 - 0.03, 0.0250
-            tempdelta = deltaoutput * outputmatrix;
+            % tempdelta = deltaoutput(1) * outputmatrix(:, :, 1);
 
-            % size(deltaoutput) = 1 1
-            % size(outputmatrix) = 50 1
-            % size(tempdelta) = 50 1
+            % for i = 2:targetNum
+            %     tempdelta = tempdelta + deltaoutput(i) * outputmatrix(:, :, i);
+            % end
+
+            % transfer = dlogsig(hiddensigma, logsig(hiddensigma));
+
+            % deltahidden = [];
+
+            % for i = 1:1:tmpNUM
+            %     deltahidden = cat(3, deltahidden, tempdelta * transfer);
+            % end
+
+            tempdelta = [];
+
+            for i = 1:targetNum
+                tempdelta = [tempdelta; deltaoutput(i) * outputmatrix(:, :, i)];
+            end
 
             transfer = dlogsig(hiddensigma, logsig(hiddensigma));
+
             deltahidden = [];
 
             for i = 1:1:tmpNUM
-                deltahidden = [deltahidden; tempdelta(i) * transfer(i)];
+                tmp_ = [];
+
+                for j = 1:1:targetNum
+                    tmp_ = [tmp_; tempdelta(j) * transfer];
+                end
+
+                deltahidden = cat(3, deltahidden, tmp_);
             end
 
             % 輸出層權重更新
-            outputmatrix = outputmatrix + learningRate * (deltaoutput * hiddennet)';
+            for i = 1:targetNum
+                outputmatrix(:, :, i) = outputmatrix(:, :, i) + learningRate * (deltaoutput(i) * hiddennet)';
+            end
 
             % 隱藏層權重更新
             newhiddenmatrix = hiddenmatrix;
@@ -114,6 +175,10 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
                     % maybe can change the weight of deltahidden
                 end
 
+            end
+
+            if learningRate > 0.001
+                learningRate = learningRate - 0.001;
             end
 
             hiddenmatrix = newhiddenmatrix;
@@ -136,12 +201,40 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
     for i = 1:length_i
         hiddensigma = input(i, :) * hiddenmatrix;
         hiddennet = logsig(hiddensigma);
-        outputsigma = hiddennet * outputmatrix;
-        outputnet = purelin(outputsigma);
 
-        if outputnet > target(i) - 0.5 & outputnet <= target(i) + 0.5
+        outputsigma = [];
+        outputnet = [];
+        maxNum = -inf; maxNumIdx = 0;
+
+        for j = 1:targetNum
+            outputsigma = [outputsigma, hiddennet * outputmatrix(:, :, j)];
+            outputnet = [outputnet, purelin(outputsigma(j))];
+        end
+
+        for j = 1:targetNum
+
+            if maxNum < outputnet(j)
+                maxNum = outputnet(j);
+                maxNumIdx = j;
+            end
+
+        end
+
+        maxNum = -inf; correctIdx = 0;
+
+        for j = 1:targetNum
+
+            if maxNum < target(j, :, i)
+                maxNum = target(j, :, i);
+                correctIdx = j;
+            end
+
+        end
+
+        if maxNumIdx == correctIdx
             Train_Correct = Train_Correct + 1;
-            trainACCList = [trainACCList; i];
+            ansList = [i, correctIdx];
+            trainACCList = [trainACCList; ansList];
         end
 
     end
@@ -158,12 +251,40 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
     for i = 1:length(input)
         hiddensigma = input(i, :) * hiddenmatrix;
         hiddennet = logsig(hiddensigma);
-        outputsigma = hiddennet * outputmatrix;
-        outputnet = purelin(outputsigma);
 
-        if outputnet > target(i) - 0.5 & outputnet <= target(i) + 0.5
+        outputsigma = [];
+        outputnet = [];
+        maxNum = -inf; maxNumIdx = 0;
+
+        for j = 1:targetNum
+            outputsigma = [outputsigma, hiddennet * outputmatrix(:, :, j)];
+            outputnet = [outputnet, purelin(outputsigma(j))];
+        end
+
+        for j = 1:targetNum
+
+            if maxNum < outputnet(j)
+                maxNum = outputnet(j);
+                maxNumIdx = j;
+            end
+
+        end
+
+        maxNum = -inf; correctIdx = 0;
+
+        for j = 1:targetNum
+
+            if maxNum < target(j, :, i)
+                maxNum = target(j, :, i);
+                correctIdx = j;
+            end
+
+        end
+
+        if maxNumIdx == correctIdx
             Test_Correct = Test_Correct + 1;
-            testACCList = [testACCList; i];
+            ansList = [i, correctIdx];
+            testACCList = [testACCList; ansList];
         end
 
     end
