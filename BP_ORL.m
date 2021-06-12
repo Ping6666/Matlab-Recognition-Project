@@ -40,9 +40,10 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
     length_i = length(input);
     length_j = 20; % data 寬度 = ldanum
 
-    epochMax = 100;
-    learningRate = 0.45;
-    % Learning rate : 0.45->0.01 ???
+    % epochMax = 2000;
+    % learningRate = 0.65;
+    epochMax = 5000;
+    learningRate = 0.65;
 
     % tag of the dataset
     target = [];
@@ -126,58 +127,30 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
             deltaoutput = [];
             tempError = 0; %error
 
-            index = 0;
-
-            for i = 1:targetNum % i-th node of output
+            for i = 1:targetNum
                 tempNum2 = dpurelin(outputsigma(i, :));
+                % tempNum1 = hiddennet * outputmatrix(:, :, i);
+                % tempNum2 = dtansig(tempNum1, tansig(tempNum1));
                 % doutputnet = [doutputnet; tempNum2];
-
-                maxNum_target = -inf;
-                maxNum_target_idx = 0;
-
-                for j = 1:targetNum
-
-                    if maxNum_target < target(j, :, iter)
-                        maxNum_target = target(j, :, iter);
-                        maxNum_target_idx = j;
-                    end
-
-                end
-
-                index = maxNum_target_idx;
-
-                tempNum3 = target(:, :, iter) - vecnorm(outputnet);
-                tempNum3 = vecnorm(tempNum3);
-                % tempNum3 = tempNum3 / targetNum;
-
-                deltaoutput = [deltaoutput; tempNum3 * tempNum2];
-
-                if index == i
-                    % tempError = tempError + tempNum3;
-                    tempError = tempNum3;
-                end
-
+                temp_ = target(:, :, iter) - outputnet(i, :);
+                deltaoutput = [deltaoutput; temp_ * tempNum2];
+                tempError = tempError + temp_;
             end
 
-            % tempError = tempError / targetNum;
-
-            % size(deltaoutput) = 40 1
+            tempError = tempError / targetNum;
             t = [t; tempError.^2];
 
             % 隱藏層的 delta
-            tempdelta = zeros(tmpNUM, 1);
+            index = ceil(iter / 5);
+            tempdelta = deltaoutput(index, :) * outputmatrix(:, :, index);
 
-            for i = 1:targetNum
-                tempOutput = deltaoutput(i, :) * outputmatrix(:, :, i);
-                tempdelta = tempdelta + tempOutput;
-            end
-
+            % tempdelta = zeros(tmpNUM, 1);
+            % for i = 1:targetNum
+            %     % tempdelta = [tempdelta; deltaoutput(i, :) * outputmatrix(:, :, i)];
+            %     tempdelta = tempdelta + deltaoutput(i, :) * outputmatrix(:, :, i);
+            % end
             % tempdelta = tempdelta / targetNum;
             % size(tempdelta) = 30 1
-            % maybe need to change a bit here
-
-            % tempdelta = deltaoutput(index, :) * outputmatrix(:, :, index);
-
             transfer = dlogsig(hiddensigma, logsig(hiddensigma));
             deltahidden = [];
 
@@ -202,13 +175,11 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
 
             end
 
-            hiddenmatrix = newhiddenmatrix;
-
-            % learningRate decreasing
-            if learningRate > 0.01 & epoch > 50
-                learningRate = learningRate - 0.01;
+            if learningRate > 0.005 %& epoch > 50
+                learningRate = learningRate - 0.005;
             end
 
+            hiddenmatrix = newhiddenmatrix;
         end
 
         RMSE(epoch) = sqrt(sum(t) / length_i);
@@ -226,25 +197,22 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
     trainACCList = [];
 
     for i = 1:length_i
-
         hiddensigma = input(i, :) * hiddenmatrix;
         hiddennet = logsig(hiddensigma);
 
         outputsigma = [];
         outputnet = [];
-
-        for j = 1:targetNum
-            tempNum1 = hiddennet * outputmatrix(:, :, j);
-            outputsigma = [outputsigma; tempNum1];
-            outputnet = [outputnet; purelin(tempNum1)];
-        end
-
         maxNum = -inf; maxNumIdx = 0;
 
         for j = 1:targetNum
+            outputsigma = [outputsigma, hiddennet * outputmatrix(:, :, j)];
+            outputnet = [outputnet, purelin(outputsigma(j))];
+        end
 
-            if maxNum < outputnet(j, :)
-                maxNum = outputnet(j, :);
+        for j = 1:targetNum
+
+            if maxNum < outputnet(j)
+                maxNum = outputnet(j);
                 maxNumIdx = j;
             end
 
@@ -271,7 +239,6 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
     end
 
     Train_Percent = Train_Correct / length_i;
-    fprintf("%g, %g, %g\n", Train_Correct, length_i, Train_Percent);
 
     % test
     input = prototypeFACE(2:2:end, :);
@@ -280,25 +247,22 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
     testACCList = [];
 
     for i = 1:length(input)
-
         hiddensigma = input(i, :) * hiddenmatrix;
         hiddennet = logsig(hiddensigma);
 
         outputsigma = [];
         outputnet = [];
-
-        for j = 1:targetNum
-            tempNum1 = hiddennet * outputmatrix(:, :, j);
-            outputsigma = [outputsigma; tempNum1];
-            outputnet = [outputnet; purelin(tempNum1)];
-        end
-
         maxNum = -inf; maxNumIdx = 0;
 
         for j = 1:targetNum
+            outputsigma = [outputsigma, hiddennet * outputmatrix(:, :, j)];
+            outputnet = [outputnet, purelin(outputsigma(j))];
+        end
 
-            if maxNum < outputnet(j, :)
-                maxNum = outputnet(j, :);
+        for j = 1:targetNum
+
+            if maxNum < outputnet(j)
+                maxNum = outputnet(j);
                 maxNumIdx = j;
             end
 
@@ -324,8 +288,7 @@ function [Train_Percent, trainACCList, Test_Percent, testACCList] = BP_ORL(proto
 
     end
 
-    Test_Percent = (Test_Correct) / (length(input));
-    fprintf("%g, %g, %g\n", Test_Correct, length(input), Test_Percent);
+    Test_Percent = Test_Correct / length(input);
 
     % acc > 0.9
 end
