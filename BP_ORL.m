@@ -1,6 +1,6 @@
 function [Train_Percent, trainACCList, trainNonACCList, Test_Percent, testACCList, testNonACCList] = BP_ORL(prototypeFACE)
-    % version : 6
-    
+    % version : 7
+
     divideNum = 1;
 
     % only need to train and test total 200 records
@@ -43,11 +43,50 @@ function [Train_Percent, trainACCList, trainNonACCList, Test_Percent, testACCLis
     % size(input) = 10 20
 
     targetNum = ceil(40 / divideNum); % tag num = 40 (個分類)
-    tmpNUM = 50; % node num 40 is enough
+    tmpNUM = 175; % node num 40 is enough
     length_i = length(input(:, 1));
     length_j = 20; % data 寬度 = ldanum
 
-    epochMax = 50; % 1000 - 5000
+    % epoch : acc = train, test with node num  40 and total data set
+    %   500 : acc =  67.5, 54.5
+    %  1000 : acc =  63.0, 53.0
+    %  1500 : acc =  65.0, 55.5
+    %  2000 : acc =  75.5, 64.0
+    %  2500 : acc =  74.5, 57.0
+    %  3000 : acc =  71.5, 65.0
+    %  3500 : acc =  73.0, 65.0
+    %  4000 : acc =  72.5, 55.0
+    %  4500 : acc =  65.2, 54.0
+    %  5000 : acc =  79.0, 65.5
+
+    % epoch : acc = train, test with node num  60 and total data set
+    %  2000 : acc =  78.0, 67.0
+
+    % epoch : acc = train, test with node num 100 and total data set
+    %  2000 : acc =  89.5, 79.0
+
+    % epoch : acc = train, test with node num 125 and total data set
+    %  2000 : acc =  90.5, 77.5
+
+    % epoch : acc = train, test with node num 150 and total data set
+    %  2000 : acc =  91.5, 80.5
+    %  3000 : acc =  88.5, 82.0
+    %  5000 : acc =  91.0, 82.5
+
+    % epoch : acc = train, test with node num 175 and total data set
+    %  2000 : acc =  91.0, 81.0
+    %  3000 : acc =  92.0, 84.0
+    %- 3000 : acc =  93.5, 81.5 with 2 *
+    %- 3000 : acc =  92.5, 84.5 with 4 *
+    %- 3000 : acc =  94.5, 85.5 with 5 *
+    %- 3000 : acc =  93.5, 83.5 with 6 *
+    %- 3000 : acc =  89.0, 77.0 with 8 *
+    %  5000 : acc =  91.0, 80.5
+
+    % epoch : acc = train, test with node num 150 and total data set
+    %  2000 : acc =  90.0, 77.5
+
+    epochMax = 3000; % 500 - 5000
     learningRate = 0.65;
 
     % tag of the dataset
@@ -147,7 +186,7 @@ function [Train_Percent, trainACCList, trainNonACCList, Test_Percent, testACCLis
 
             % 隱藏層的 delta
             index = ceil(iter / 5);
-            tempdelta = deltaoutput(index, :) * outputmatrix(:, :, index);
+            tempdelta = 5 * deltaoutput(index, :) * outputmatrix(:, :, index);
 
             % tempdelta = zeros(tmpNUM, 1);
 
